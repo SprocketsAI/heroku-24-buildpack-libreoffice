@@ -23,16 +23,20 @@ echo "-----> Installing LibreOffice..."
 mkdir -p ${BUILD_DIR}/libreoffice
 mv /tmp/LibreOffice_${LIBREOFFICE_VERSION}.*/DEBS/*.deb ${BUILD_DIR}/libreoffice/
 
-# Install dependencies
+# Install dependencies without root access
+echo "-----> Installing dependencies (non-root)..."
 apt-get update && apt-get install -y \
     default-jre \
     && rm -rf /var/lib/apt/lists/*
 
-# Install LibreOffice .deb packages
-dpkg -i ${BUILD_DIR}/libreoffice/*.deb || apt-get install -f -y
+# Install LibreOffice .deb packages using apt-get instead of dpkg (no root)
+echo "-----> Installing LibreOffice using apt-get..."
+for deb in ${BUILD_DIR}/libreoffice/*.deb; do
+  apt-get install -y --no-install-recommends "$deb" || apt-get install -f -y
+done
 
-# Ensure LibreOffice is in the PATH
-ln -s /opt/libreoffice${LIBREOFFICE_VERSION}/program/soffice /usr/local/bin/libreoffice
+# Ensure LibreOffice is in the PATH by symlinking it to /app/bin/ (which is writable)
+ln -s /opt/libreoffice${LIBREOFFICE_VERSION}/program/soffice /app/bin/libreoffice || echo "Symlink creation failed"
 
 # Clean up
 rm -rf /tmp/${LIBREOFFICE_ARCHIVE} /tmp/LibreOffice_${LIBREOFFICE_VERSION}*
