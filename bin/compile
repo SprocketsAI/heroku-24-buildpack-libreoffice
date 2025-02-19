@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+BUILD_DIR=$1
+CACHE_DIR=$2
+LIBREOFFICE_VERSION="25.2.0"
+LIBREOFFICE_ARCHIVE="LibreOffice_${LIBREOFFICE_VERSION}_Linux_x86-64_deb.tar.gz"
+LIBREOFFICE_URL="https://download.documentfoundation.org/libreoffice/stable/${LIBREOFFICE_VERSION}/deb/x86_64/${LIBREOFFICE_ARCHIVE}"
+
+echo "-----> Downloading LibreOffice ${LIBREOFFICE_VERSION}..."
+curl -L -o /tmp/${LIBREOFFICE_ARCHIVE} ${LIBREOFFICE_URL}
+
+echo "-----> Extracting LibreOffice..."
+tar -xzf /tmp/${LIBREOFFICE_ARCHIVE} -C /tmp
+
+echo "-----> Installing LibreOffice..."
+mkdir -p ${BUILD_DIR}/libreoffice
+mv /tmp/LibreOffice_${LIBREOFFICE_VERSION}.*/DEBS/*.deb ${BUILD_DIR}/libreoffice/
+
+# Install Java and cleanup apt cache
+apt-get update && apt-get install -y \
+    default-jre \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install LibreOffice packages
+dpkg -i ${BUILD_DIR}/libreoffice/*.deb || apt-get install -f -y
+
+# Ensure LibreOffice is in the PATH
+ln -s /opt/libreoffice${LIBREOFFICE_VERSION}/program/soffice /usr/local/bin/libreoffice
+
+# Clean up unnecessary files
+rm -rf /tmp/${LIBREOFFICE_ARCHIVE} /tmp/LibreOffice_${LIBREOFFICE_VERSION}*
+
+echo "-----> LibreOffice and dependencies installation complete."

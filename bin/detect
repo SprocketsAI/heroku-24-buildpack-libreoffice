@@ -1,0 +1,3 @@
+#!/bin/bash
+echo "LibreOffice Buildpack"
+exit 0

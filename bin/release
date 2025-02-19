@@ -1,0 +1,4 @@
+#!/bin/bash
+echo "-----> LibreOffice installed."
+echo "-----> LibreOffice version: $(/opt/libreoffice25.2/program/soffice --headless --version)"
+exit 0
