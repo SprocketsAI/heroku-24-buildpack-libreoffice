@@ -8,7 +8,7 @@ ENV_DIR=$3
 
 LIBREOFFICE_VERSION="25.2.3"
 LIBREOFFICE_ARCHIVE="LibreOffice_${LIBREOFFICE_VERSION}_Linux_x86-64_deb.tar.gz"
-LIBREOFFICE_URL="https://download.libreoffice.org/libreoffice/stable/${LIBREOFFICE_VERSION}/deb/x86_64/${LIBREOFFICE_ARCHIVE}"
+LIBREOFFICE_URL="https://download.documentfoundation.org/libreoffice/stable/${LIBREOFFICE_VERSION}/deb/x86_64/${LIBREOFFICE_ARCHIVE}"
 
 LIBREOFFICE_DIR="${BUILD_DIR}/libreoffice"
 TEMP_DIR="/tmp/libreoffice_install"
@@ -22,23 +22,9 @@ else
   echo "-----> Downloading LibreOffice ${LIBREOFFICE_VERSION}..."
   mkdir -p "${CACHE_DIR}"
 
-  # Try multiple mirror URLs if the first one fails
-  DOWNLOAD_SUCCESS=false
-
-  # Try main download.libreoffice.org mirror
-  echo "       Trying main mirror..."
-  if curl -L -f -o "${CACHE_DIR}/${LIBREOFFICE_ARCHIVE}" "${LIBREOFFICE_URL}"; then
-    DOWNLOAD_SUCCESS=true
-  else
-    echo "       Main mirror failed, trying document foundation mirror..."
-    LIBREOFFICE_URL_ALT="https://download.documentfoundation.org/libreoffice/stable/${LIBREOFFICE_VERSION}/deb/x86_64/${LIBREOFFICE_ARCHIVE}"
-    if curl -L -f -o "${CACHE_DIR}/${LIBREOFFICE_ARCHIVE}" "${LIBREOFFICE_URL_ALT}"; then
-      DOWNLOAD_SUCCESS=true
-    fi
-  fi
-
-  if [ "$DOWNLOAD_SUCCESS" = false ]; then
-    echo "ERROR: Failed to download LibreOffice from all mirrors"
+  echo "       Downloading from: ${LIBREOFFICE_URL}"
+  if ! curl -L -f -o "${CACHE_DIR}/${LIBREOFFICE_ARCHIVE}" "${LIBREOFFICE_URL}"; then
+    echo "ERROR: Failed to download LibreOffice from ${LIBREOFFICE_URL}"
     exit 1
   fi
 fi
