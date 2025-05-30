@@ -1,44 +1,106 @@
 #!/usr/bin/env bash
+
+set -e
+
 BUILD_DIR=$1
 CACHE_DIR=$2
+ENV_DIR=$3
+
 LIBREOFFICE_VERSION="25.2.0"
 LIBREOFFICE_ARCHIVE="LibreOffice_${LIBREOFFICE_VERSION}_Linux_x86-64_deb.tar.gz"
 LIBREOFFICE_URL="https://download.documentfoundation.org/libreoffice/stable/${LIBREOFFICE_VERSION}/deb/x86_64/${LIBREOFFICE_ARCHIVE}"
+
+LIBREOFFICE_DIR="${BUILD_DIR}/libreoffice"
+TEMP_DIR="/tmp/libreoffice_install"
+
+echo "-----> Installing LibreOffice ${LIBREOFFICE_VERSION}"
 
 # Check if the tarball already exists in the cache
 if [ -f "${CACHE_DIR}/${LIBREOFFICE_ARCHIVE}" ]; then
   echo "-----> Using cached LibreOffice tarball..."
 else
-  # Download LibreOffice if not found in cache
   echo "-----> Downloading LibreOffice ${LIBREOFFICE_VERSION}..."
-  curl -L -o "${CACHE_DIR}/${LIBREOFFICE_ARCHIVE}" ${LIBREOFFICE_URL}
+  mkdir -p "${CACHE_DIR}"
+  curl -L -o "${CACHE_DIR}/${LIBREOFFICE_ARCHIVE}" "${LIBREOFFICE_URL}"
 fi
+
+# Create directories
+mkdir -p "${LIBREOFFICE_DIR}"
+mkdir -p "${TEMP_DIR}"
+mkdir -p "${BUILD_DIR}/bin"
 
 # Extract the tarball
 echo "-----> Extracting LibreOffice..."
-tar -xzf ${CACHE_DIR}/${LIBREOFFICE_ARCHIVE} -C /tmp
+tar -xzf "${CACHE_DIR}/${LIBREOFFICE_ARCHIVE}" -C "${TEMP_DIR}"
 
-# Install LibreOffice
-echo "-----> Installing LibreOffice..."
-mkdir -p ${BUILD_DIR}/libreoffice
-mv /tmp/LibreOffice_${LIBREOFFICE_VERSION}.*/DEBS/*.deb ${BUILD_DIR}/libreoffice/
+# Find the extracted directory
+EXTRACTED_DIR=$(find "${TEMP_DIR}" -maxdepth 1 -name "LibreOffice_*" -type d | head -1)
 
-# Install dependencies without root access
-echo "-----> Installing dependencies (non-root)..."
-apt-get update && apt-get install -y \
-    default-jre \
-    && rm -rf /var/lib/apt/lists/*
+if [ -z "${EXTRACTED_DIR}" ]; then
+  echo "ERROR: Could not find extracted LibreOffice directory"
+  exit 1
+fi
 
-# Install LibreOffice .deb packages using apt-get instead of dpkg (no root)
-echo "-----> Installing LibreOffice using apt-get..."
-for deb in ${BUILD_DIR}/libreoffice/*.deb; do
-  apt-get install -y --no-install-recommends "$deb" || apt-get install -f -y
+# Extract .deb packages manually (without dpkg/root)
+echo "-----> Extracting LibreOffice packages..."
+cd "${EXTRACTED_DIR}/DEBS"
+
+for deb in *.deb; do
+  echo "       Extracting ${deb}..."
+  # Extract .deb file (which is an ar archive)
+  ar x "${deb}"
+
+  # Extract data.tar.xz (contains the actual files)
+  if [ -f data.tar.xz ]; then
+    tar -xf data.tar.xz -C "${LIBREOFFICE_DIR}"
+    rm -f data.tar.xz
+  elif [ -f data.tar.gz ]; then
+    tar -xzf data.tar.gz -C "${LIBREOFFICE_DIR}"
+    rm -f data.tar.gz
+  fi
+
+  # Clean up control files
+  rm -f control.tar.* debian-binary
 done
 
-# Ensure LibreOffice is in the PATH by symlinking it to /app/bin/ (which is writable)
-ln -s /opt/libreoffice${LIBREOFFICE_VERSION}/program/soffice /app/bin/libreoffice || echo "Symlink creation failed"
+# Find LibreOffice installation path
+LO_PATH=$(find "${LIBREOFFICE_DIR}" -name "soffice" -type f | head -1)
+if [ -z "${LO_PATH}" ]; then
+  echo "ERROR: Could not find LibreOffice soffice binary"
+  exit 1
+fi
+
+LO_PROGRAM_DIR=$(dirname "${LO_PATH}")
+LO_INSTALL_DIR=$(dirname "${LO_PROGRAM_DIR}")
+
+echo "-----> LibreOffice installed at: ${LO_INSTALL_DIR}"
+
+# Create wrapper script
+echo "-----> Creating LibreOffice wrapper..."
+cat > "${BUILD_DIR}/bin/libreoffice" << EOF
+#!/usr/bin/env bash
+export URE_BOOTSTRAP="file://${LO_INSTALL_DIR}/program/fundamentalrc"
+export OFFICE_PROGRAM_PATH="${LO_PROGRAM_DIR}"
+export SAL_USE_VCLPLUGIN=svp
+export HOME=\${HOME:-/tmp}
+exec "${LO_PATH}" "\$@"
+EOF
+
+chmod +x "${BUILD_DIR}/bin/libreoffice"
+
+# Create soffice alias
+ln -sf "${BUILD_DIR}/bin/libreoffice" "${BUILD_DIR}/bin/soffice"
+
+# Set up profile.d script for runtime environment
+mkdir -p "${BUILD_DIR}/.profile.d"
+cat > "${BUILD_DIR}/.profile.d/libreoffice.sh" << EOF
+export PATH="\$PATH:\$HOME/bin"
+export URE_BOOTSTRAP="file://\$HOME/libreoffice/opt/libreoffice${LIBREOFFICE_VERSION}/program/fundamentalrc"
+export SAL_USE_VCLPLUGIN=svp
+EOF
 
 # Clean up
-rm -rf /tmp/${LIBREOFFICE_ARCHIVE} /tmp/LibreOffice_${LIBREOFFICE_VERSION}*
+rm -rf "${TEMP_DIR}"
 
-echo "-----> LibreOffice and dependencies installation complete."
+echo "-----> LibreOffice installation complete"
+echo "       LibreOffice can be accessed via 'libreoffice' or 'soffice' commands"

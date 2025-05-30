@@ -1,4 +1,10 @@
 #!/bin/bash
-echo "-----> LibreOffice installed."
-echo "-----> LibreOffice version: $(/opt/libreoffice25.2/program/soffice --headless --version)"
+
+cat << EOF
+---
+default_process_types:
+  web: echo "LibreOffice buildpack installed successfully"
+addons: []
+config_vars: {}
+EOF
 exit 0
