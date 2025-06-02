@@ -120,6 +120,13 @@ extract_deb_package() {
     # Clean up
     rm -rf "${temp_extract}"
     cd "${BUILD_DIR}"
+
+    # Verify extraction for critical libraries
+    if [ "$package_name" = "libxinerama1" ]; then
+        echo "       Verifying libXinerama extraction..."
+        find "${DEPS_DIR}" -name "*Xinerama*" -type f || echo "       No Xinerama files found"
+        find "${DEPS_DIR}" -name "libXinerama.so*" -type f || echo "       No libXinerama.so files found"
+    fi
 }
 
 # Install required X11 libraries manually
@@ -130,6 +137,28 @@ mkdir -p "${DEPS_DIR}"
 for package_name in "${REQUIRED_PACKAGE_NAMES[@]}"; do
     extract_deb_package "${package_name}"
 done
+
+# Create symlinks for libraries that might have version mismatches
+echo "-----> Creating library symlinks..."
+cd "${DEPS_DIR}"
+if [ -d "usr/lib/x86_64-linux-gnu" ]; then
+    cd "usr/lib/x86_64-linux-gnu"
+    # Create symlinks for common library name variations
+    for lib in libXinerama.so.*; do
+        if [ -f "$lib" ] && [ ! -L "libXinerama.so.1" ]; then
+            ln -sf "$lib" "libXinerama.so.1"
+            echo "       Created symlink: libXinerama.so.1 -> $lib"
+        fi
+    done
+    cd "${BUILD_DIR}"
+fi
+
+# Verify X11 libraries are available
+echo "-----> Verifying X11 libraries..."
+find "${DEPS_DIR}" -name "libXinerama.so*" -type f
+find "${DEPS_DIR}" -name "libX11*.so*" -type f | head -3
+echo "       Library directories:"
+find "${DEPS_DIR}" -type d -name "*lib*" | head -5
 
 echo "-----> Installing LibreOffice ${LIBREOFFICE_VERSION}"
 
@@ -259,7 +288,19 @@ export OFFICE_PROGRAM_PATH="\$HOME/libreoffice/program"
 export SAL_USE_VCLPLUGIN=svp
 export HOME=\${HOME:-/tmp}
 export DISPLAY=\${DISPLAY:-:99}
-export LD_LIBRARY_PATH="\$HOME/libreoffice/program:\$HOME/deps/usr/lib/x86_64-linux-gnu:\$HOME/deps/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH"
+
+# Set up library paths with multiple potential locations
+export LD_LIBRARY_PATH="\$HOME/libreoffice/program:\$HOME/deps/usr/lib/x86_64-linux-gnu:\$HOME/deps/lib/x86_64-linux-gnu:\$HOME/deps/usr/lib:\$HOME/deps/lib:\$LD_LIBRARY_PATH"
+
+# Debug library paths if requested
+if [ "\$LIBREOFFICE_DEBUG" = "1" ]; then
+    echo "LibreOffice Debug Mode"
+    echo "LD_LIBRARY_PATH=\$LD_LIBRARY_PATH"
+    echo "Looking for libXinerama.so.1:"
+    find "\$HOME/deps" -name "libXinerama.so*" -type f 2>/dev/null || echo "No libXinerama files found"
+    echo "Library directories:"
+    find "\$HOME/deps" -type d -name "*lib*" 2>/dev/null | head -5
+fi
 
 # Ensure the binary exists
 if [ ! -f "\$HOME/libreoffice/program/soffice" ]; then
@@ -283,7 +324,7 @@ cat > "${BUILD_DIR}/.profile.d/libreoffice.sh" << EOF
 export PATH="\$PATH:\$HOME/bin"
 export URE_BOOTSTRAP="file://\$HOME/libreoffice/program/fundamentalrc"
 export SAL_USE_VCLPLUGIN=svp
-export LD_LIBRARY_PATH="\$HOME/libreoffice/program:\$HOME/deps/usr/lib/x86_64-linux-gnu:\$HOME/deps/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="\$HOME/libreoffice/program:\$HOME/deps/usr/lib/x86_64-linux-gnu:\$HOME/deps/lib/x86_64-linux-gnu:\$HOME/deps/usr/lib:\$HOME/deps/lib:\$LD_LIBRARY_PATH"
 EOF
 
 # Clean up cache to reduce slug size (keep only essential files)
