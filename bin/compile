@@ -206,6 +206,27 @@ LO_PROGRAM_DIR=$(dirname "${LO_PATH}")
 LO_INSTALL_DIR=$(dirname "${LO_PROGRAM_DIR}")
 
 echo "-----> LibreOffice installed at: ${LO_INSTALL_DIR}"
+echo "-----> LibreOffice binary found at: ${LO_PATH}"
+
+# Ensure we have the correct final structure
+FINAL_LO_DIR="${BUILD_DIR}/libreoffice"
+if [ "${LO_INSTALL_DIR}" != "${FINAL_LO_DIR}" ]; then
+    echo "-----> Moving LibreOffice to final location..."
+    rm -rf "${FINAL_LO_DIR}"
+    mkdir -p "$(dirname ${FINAL_LO_DIR})"
+    mv "${LO_INSTALL_DIR}" "${FINAL_LO_DIR}"
+fi
+
+# Verify the final binary location
+FINAL_SOFFICE_PATH="${FINAL_LO_DIR}/program/soffice"
+if [ ! -f "${FINAL_SOFFICE_PATH}" ]; then
+    echo "ERROR: LibreOffice binary not found at expected location: ${FINAL_SOFFICE_PATH}"
+    echo "Available files in LibreOffice directory:"
+    find "${FINAL_LO_DIR}" -name "soffice*" -type f || echo "No soffice files found"
+    exit 1
+fi
+
+echo "-----> LibreOffice binary verified at: ${FINAL_SOFFICE_PATH}"
 
 # Create wrapper script
 echo "-----> Creating LibreOffice wrapper..."
@@ -217,6 +238,15 @@ export SAL_USE_VCLPLUGIN=svp
 export HOME=\${HOME:-/tmp}
 export DISPLAY=\${DISPLAY:-:99}
 export LD_LIBRARY_PATH="\$HOME/libreoffice/program:\$HOME/deps/usr/lib/x86_64-linux-gnu:\$HOME/deps/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH"
+
+# Ensure the binary exists
+if [ ! -f "\$HOME/libreoffice/program/soffice" ]; then
+    echo "ERROR: LibreOffice binary not found at \$HOME/libreoffice/program/soffice"
+    echo "Available files:"
+    find "\$HOME/libreoffice" -name "soffice*" -type f 2>/dev/null || echo "No soffice files found"
+    exit 1
+fi
+
 exec "\$HOME/libreoffice/program/soffice" "\$@"
 EOF
 
