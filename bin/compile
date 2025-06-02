@@ -229,7 +229,7 @@ ln -sf "${BUILD_DIR}/bin/libreoffice" "${BUILD_DIR}/bin/soffice"
 mkdir -p "${BUILD_DIR}/.profile.d"
 cat > "${BUILD_DIR}/.profile.d/libreoffice.sh" << EOF
 export PATH="\$PATH:\$HOME/bin"
-export URE_BOOTSTRAP="file://\$HOME/libreoffice/opt/libreoffice${LIBREOFFICE_VERSION}/program/fundamentalrc"
+export URE_BOOTSTRAP="file://\$HOME/libreoffice/program/fundamentalrc"
 export SAL_USE_VCLPLUGIN=svp
 export LD_LIBRARY_PATH="\$HOME/deps/usr/lib/x86_64-linux-gnu:\$HOME/deps/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH"
 EOF
