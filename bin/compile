@@ -211,13 +211,13 @@ echo "-----> LibreOffice installed at: ${LO_INSTALL_DIR}"
 echo "-----> Creating LibreOffice wrapper..."
 cat > "${BUILD_DIR}/bin/libreoffice" << EOF
 #!/usr/bin/env bash
-export URE_BOOTSTRAP="file://${LO_INSTALL_DIR}/program/fundamentalrc"
-export OFFICE_PROGRAM_PATH="${LO_PROGRAM_DIR}"
+export URE_BOOTSTRAP="file://\$HOME/libreoffice/program/fundamentalrc"
+export OFFICE_PROGRAM_PATH="\$HOME/libreoffice/program"
 export SAL_USE_VCLPLUGIN=svp
 export HOME=\${HOME:-/tmp}
 export DISPLAY=\${DISPLAY:-:99}
-export LD_LIBRARY_PATH="${LO_PROGRAM_DIR}:\${HOME}/deps/usr/lib/x86_64-linux-gnu:\${HOME}/deps/lib/x86_64-linux-gnu:\${LD_LIBRARY_PATH}"
-exec "${LO_PATH}" "\$@"
+export LD_LIBRARY_PATH="\$HOME/libreoffice/program:\$HOME/deps/usr/lib/x86_64-linux-gnu:\$HOME/deps/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH"
+exec "\$HOME/libreoffice/program/soffice" "\$@"
 EOF
 
 chmod +x "${BUILD_DIR}/bin/libreoffice"
@@ -231,7 +231,7 @@ cat > "${BUILD_DIR}/.profile.d/libreoffice.sh" << EOF
 export PATH="\$PATH:\$HOME/bin"
 export URE_BOOTSTRAP="file://\$HOME/libreoffice/program/fundamentalrc"
 export SAL_USE_VCLPLUGIN=svp
-export LD_LIBRARY_PATH="\$HOME/deps/usr/lib/x86_64-linux-gnu:\$HOME/deps/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="\$HOME/libreoffice/program:\$HOME/deps/usr/lib/x86_64-linux-gnu:\$HOME/deps/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH"
 EOF
 
 # Clean up
