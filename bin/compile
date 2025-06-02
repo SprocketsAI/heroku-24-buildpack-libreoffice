@@ -196,37 +196,55 @@ for deb in *.deb; do
 done
 
 # Find LibreOffice installation path
+echo "-----> Searching for LibreOffice binary..."
 LO_PATH=$(find "${LIBREOFFICE_DIR}" -name "soffice" -type f | head -1)
 if [ -z "${LO_PATH}" ]; then
   echo "ERROR: Could not find LibreOffice soffice binary"
+  echo "Directory structure:"
+  find "${LIBREOFFICE_DIR}" -type f -name "*soffice*" || echo "No soffice files found"
+  echo "Top-level directories:"
+  find "${LIBREOFFICE_DIR}" -maxdepth 2 -type d
   exit 1
 fi
 
 LO_PROGRAM_DIR=$(dirname "${LO_PATH}")
 LO_INSTALL_DIR=$(dirname "${LO_PROGRAM_DIR}")
 
-echo "-----> LibreOffice installed at: ${LO_INSTALL_DIR}"
 echo "-----> LibreOffice binary found at: ${LO_PATH}"
+echo "-----> Program directory: ${LO_PROGRAM_DIR}"
+echo "-----> Install directory: ${LO_INSTALL_DIR}"
 
-# Ensure we have the correct final structure
+# The LibreOffice files are already in the correct location (BUILD_DIR/libreoffice)
+# We just need to ensure the structure is correct
 FINAL_LO_DIR="${BUILD_DIR}/libreoffice"
-if [ "${LO_INSTALL_DIR}" != "${FINAL_LO_DIR}" ]; then
-    echo "-----> Moving LibreOffice to final location..."
-    rm -rf "${FINAL_LO_DIR}"
-    mkdir -p "$(dirname ${FINAL_LO_DIR})"
-    mv "${LO_INSTALL_DIR}" "${FINAL_LO_DIR}"
+
+# If the install directory is nested (like opt/libreoffice25.2), we need to move it up
+if [[ "${LO_INSTALL_DIR}" == *"/opt/"* ]]; then
+    echo "-----> Restructuring LibreOffice installation..."
+    # Find the actual LibreOffice installation directory
+    LO_VERSION_DIR=$(find "${LIBREOFFICE_DIR}" -path "*/opt/libreoffice*" -type d | head -1)
+    if [ -n "${LO_VERSION_DIR}" ]; then
+        echo "       Moving from ${LO_VERSION_DIR} to ${FINAL_LO_DIR}/libreoffice"
+        mkdir -p "${FINAL_LO_DIR}"
+        cp -R "${LO_VERSION_DIR}"/* "${FINAL_LO_DIR}/"
+        # Update paths
+        LO_PATH="${FINAL_LO_DIR}/program/soffice"
+        LO_PROGRAM_DIR="${FINAL_LO_DIR}/program"
+        LO_INSTALL_DIR="${FINAL_LO_DIR}"
+    fi
 fi
 
 # Verify the final binary location
-FINAL_SOFFICE_PATH="${FINAL_LO_DIR}/program/soffice"
-if [ ! -f "${FINAL_SOFFICE_PATH}" ]; then
-    echo "ERROR: LibreOffice binary not found at expected location: ${FINAL_SOFFICE_PATH}"
+if [ ! -f "${LO_PATH}" ]; then
+    echo "ERROR: LibreOffice binary not found at: ${LO_PATH}"
     echo "Available files in LibreOffice directory:"
-    find "${FINAL_LO_DIR}" -name "soffice*" -type f || echo "No soffice files found"
+    find "${FINAL_LO_DIR}" -name "*soffice*" -type f || echo "No soffice files found"
+    echo "Directory structure:"
+    find "${FINAL_LO_DIR}" -type d | head -10
     exit 1
 fi
 
-echo "-----> LibreOffice binary verified at: ${FINAL_SOFFICE_PATH}"
+echo "-----> LibreOffice binary verified at: ${LO_PATH}"
 
 # Create wrapper script
 echo "-----> Creating LibreOffice wrapper..."
