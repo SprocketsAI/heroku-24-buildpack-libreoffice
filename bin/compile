@@ -177,6 +177,10 @@ fi
 echo "-----> Extracting LibreOffice packages..."
 cd "${EXTRACTED_DIR}/DEBS"
 
+# Create temporary extraction directory
+TEMP_LO_EXTRACT="/tmp/libreoffice_extract"
+mkdir -p "${TEMP_LO_EXTRACT}"
+
 for deb in *.deb; do
   echo "       Extracting ${deb}..."
   # Extract .deb file (which is an ar archive)
@@ -184,10 +188,10 @@ for deb in *.deb; do
 
   # Extract data.tar.xz (contains the actual files)
   if [ -f data.tar.xz ]; then
-    tar -xf data.tar.xz -C "${LIBREOFFICE_DIR}"
+    tar -xf data.tar.xz -C "${TEMP_LO_EXTRACT}"
     rm -f data.tar.xz
   elif [ -f data.tar.gz ]; then
-    tar -xzf data.tar.gz -C "${LIBREOFFICE_DIR}"
+    tar -xzf data.tar.gz -C "${TEMP_LO_EXTRACT}"
     rm -f data.tar.gz
   fi
 
@@ -195,15 +199,15 @@ for deb in *.deb; do
   rm -f control.tar.* debian-binary
 done
 
-# Find LibreOffice installation path
+# Find LibreOffice installation path in temporary location
 echo "-----> Searching for LibreOffice binary..."
-LO_PATH=$(find "${LIBREOFFICE_DIR}" -name "soffice" -type f | head -1)
+LO_PATH=$(find "${TEMP_LO_EXTRACT}" -name "soffice" -type f | head -1)
 if [ -z "${LO_PATH}" ]; then
   echo "ERROR: Could not find LibreOffice soffice binary"
   echo "Directory structure:"
-  find "${LIBREOFFICE_DIR}" -type f -name "*soffice*" || echo "No soffice files found"
+  find "${TEMP_LO_EXTRACT}" -type f -name "*soffice*" || echo "No soffice files found"
   echo "Top-level directories:"
-  find "${LIBREOFFICE_DIR}" -maxdepth 2 -type d
+  find "${TEMP_LO_EXTRACT}" -maxdepth 2 -type d
   exit 1
 fi
 
@@ -211,32 +215,32 @@ LO_PROGRAM_DIR=$(dirname "${LO_PATH}")
 LO_INSTALL_DIR=$(dirname "${LO_PROGRAM_DIR}")
 
 echo "-----> LibreOffice binary found at: ${LO_PATH}"
-echo "-----> Program directory: ${LO_PROGRAM_DIR}"
-echo "-----> Install directory: ${LO_INSTALL_DIR}"
+echo "-----> Moving LibreOffice to final location..."
 
-# The LibreOffice files are already in the correct location (BUILD_DIR/libreoffice)
-# We just need to ensure the structure is correct
+# Move LibreOffice directly to the final location, avoiding duplication
 FINAL_LO_DIR="${BUILD_DIR}/libreoffice"
+mkdir -p "${FINAL_LO_DIR}"
 
-# If the install directory is nested (like opt/libreoffice25.2), we need to move it up
+# If the install directory is nested (like opt/libreoffice25.2), extract just that part
 if [[ "${LO_INSTALL_DIR}" == *"/opt/"* ]]; then
-    echo "-----> Restructuring LibreOffice installation..."
     # Find the actual LibreOffice installation directory
-    LO_VERSION_DIR=$(find "${LIBREOFFICE_DIR}" -path "*/opt/libreoffice*" -type d | head -1)
+    LO_VERSION_DIR=$(find "${TEMP_LO_EXTRACT}" -path "*/opt/libreoffice*" -type d | head -1)
     if [ -n "${LO_VERSION_DIR}" ]; then
-        echo "       Moving from ${LO_VERSION_DIR} to ${FINAL_LO_DIR}/libreoffice"
-        mkdir -p "${FINAL_LO_DIR}"
+        echo "       Moving from ${LO_VERSION_DIR} to ${FINAL_LO_DIR}"
         cp -R "${LO_VERSION_DIR}"/* "${FINAL_LO_DIR}/"
-        # Update paths
-        LO_PATH="${FINAL_LO_DIR}/program/soffice"
-        LO_PROGRAM_DIR="${FINAL_LO_DIR}/program"
-        LO_INSTALL_DIR="${FINAL_LO_DIR}"
     fi
+else
+    # Move the entire installation
+    cp -R "${LO_INSTALL_DIR}"/* "${FINAL_LO_DIR}/"
 fi
 
+# Clean up temporary extraction directory
+rm -rf "${TEMP_LO_EXTRACT}"
+
 # Verify the final binary location
-if [ ! -f "${LO_PATH}" ]; then
-    echo "ERROR: LibreOffice binary not found at: ${LO_PATH}"
+FINAL_SOFFICE_PATH="${FINAL_LO_DIR}/program/soffice"
+if [ ! -f "${FINAL_SOFFICE_PATH}" ]; then
+    echo "ERROR: LibreOffice binary not found at: ${FINAL_SOFFICE_PATH}"
     echo "Available files in LibreOffice directory:"
     find "${FINAL_LO_DIR}" -name "*soffice*" -type f || echo "No soffice files found"
     echo "Directory structure:"
@@ -244,7 +248,7 @@ if [ ! -f "${LO_PATH}" ]; then
     exit 1
 fi
 
-echo "-----> LibreOffice binary verified at: ${LO_PATH}"
+echo "-----> LibreOffice binary verified at: ${FINAL_SOFFICE_PATH}"
 
 # Create wrapper script
 echo "-----> Creating LibreOffice wrapper..."
@@ -282,7 +286,12 @@ export SAL_USE_VCLPLUGIN=svp
 export LD_LIBRARY_PATH="\$HOME/libreoffice/program:\$HOME/deps/usr/lib/x86_64-linux-gnu:\$HOME/deps/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH"
 EOF
 
-# Clean up
+# Clean up cache to reduce slug size (keep only essential files)
+echo "-----> Cleaning up cache to reduce slug size..."
+rm -f "${CACHE_DIR}/${LIBREOFFICE_ARCHIVE}"
+rm -f "${CACHE_DIR}"/*.deb
+
+# Clean up temporary directories
 rm -rf "${TEMP_DIR}"
 
 echo "-----> LibreOffice installation complete"
