@@ -12,7 +12,24 @@ LIBREOFFICE_URL="https://download.documentfoundation.org/libreoffice/stable/${LI
 
 LIBREOFFICE_DIR="${BUILD_DIR}/libreoffice"
 TEMP_DIR="/tmp/libreoffice_install"
-
+# Install required X11 libraries for headless LibreOffice
+echo "-----> Installing required X11 libraries..."
+apt-get update -qq
+apt-get install -y -qq --no-install-recommends \
+    libxinerama1 \
+    libx11-xcb1 \
+    libxrandr2 \
+    libxss1 \
+    libgconf-2-4 \
+    libxtst6 \
+    libxrender1 \
+    libxi6 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libcairo-gobject2 \
+    libdbus-glib-1-2 \
+    libdbus-1-3 \
+    libasound2
 echo "-----> Installing LibreOffice ${LIBREOFFICE_VERSION}"
 
 # Check if the tarball already exists in the cache
@@ -97,6 +114,8 @@ export URE_BOOTSTRAP="file://${LO_INSTALL_DIR}/program/fundamentalrc"
 export OFFICE_PROGRAM_PATH="${LO_PROGRAM_DIR}"
 export SAL_USE_VCLPLUGIN=svp
 export HOME=\${HOME:-/tmp}
+export DISPLAY=\${DISPLAY:-:99}
+export LD_LIBRARY_PATH="${LO_PROGRAM_DIR}:\${LD_LIBRARY_PATH}"
 exec "${LO_PATH}" "\$@"
 EOF
 
